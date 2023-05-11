@@ -28,8 +28,11 @@ jobs:
       - name: Restore Packages
         run: nuget restore pac-wrapper-dll.sln
 
-      - name: Build and Publish Web App
+      - name: Build
         run: msbuild pac-wrapper-dll.sln /p:Configuration=Release
 
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v3.1.2
+        with:
+            name: pac-wrapper
+            path: pac-wrapper-dll/bin/Release/pac-wrapper.dll
