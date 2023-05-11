@@ -19,6 +19,7 @@ namespace D365.Community.Pac.Wrapper
 
         public static string Execute(string pac, params string[] args)
         {
+            var pacDebug = bool.Parse(Environment.GetEnvironmentVariable("D365_PAC_DEBUG") ?? "false");
             var result = new List<string>();
             var failed = false;
             try
@@ -36,6 +37,7 @@ namespace D365.Community.Pac.Wrapper
                     }
                 };
                 process.Start();
+
                 using (var sw = process.StandardInput)
                 {
                     sw.WriteLine("{\"Arguments\":[" + string.Join(",", args.Select(a => $"\"{a}\"")) + "]}");
@@ -47,7 +49,7 @@ namespace D365.Community.Pac.Wrapper
                 {
                     var line = process.StandardOutput.ReadLine();
                     if (string.IsNullOrEmpty(line)) continue;
-                    Console.WriteLine(line);
+                    if (pacDebug) Console.WriteLine(line);
                     result.Add(line);
                     using (var ms = new MemoryStream(Encoding.UTF8.GetBytes(line)))
                     {
@@ -62,9 +64,12 @@ namespace D365.Community.Pac.Wrapper
                         {
                             Console.Error.WriteLine(warning);
                         }
-                        foreach (var information in pacResult.Information)
+                        if (pacDebug)
                         {
-                            Console.Error.WriteLine(information);
+                            foreach (var information in pacResult.Information)
+                            {
+                                Console.Error.WriteLine(information);
+                            }
                         }
                     }
                 }
