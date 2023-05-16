@@ -19,12 +19,15 @@ namespace D365.Community.Pac.Wrapper
 
         public static string Execute(string pac, params string[] args)
         {
+            var encoding = Encoding.GetEncoding(int.Parse(Environment.GetEnvironmentVariable("D365_PAC_CODEPAGE") ?? "1252"));
             var pacDebug = bool.Parse(Environment.GetEnvironmentVariable("D365_PAC_DEBUG") ?? "false");
             var pacTrace = bool.Parse(Environment.GetEnvironmentVariable("D365_PAC_TRACE") ?? "false");
             var result = new List<string>();
             var failed = false;
             try
             {
+                Console.InputEncoding = encoding;
+                Console.OutputEncoding = encoding;
                 var process = new Process
                 {
                     StartInfo = new ProcessStartInfo
@@ -34,18 +37,26 @@ namespace D365.Community.Pac.Wrapper
                         UseShellExecute = false,
                         RedirectStandardInput = true,
                         RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        StandardErrorEncoding = encoding,
+                        StandardOutputEncoding = encoding,
                         CreateNoWindow = true
                     }
                 };
                 process.Start();
 
-                using (var sw = process.StandardInput)
+                var arguments = "{\"Arguments\":[" + string.Join(",", args.Select(a => $"\"{a}\"")) + "]}" + Environment.NewLine;
+                if (pacTrace) Console.Write(arguments);
+                var exit = "{\"Arguments\":[\"exit\"]}" + Environment.NewLine;
+
+                var argumentsBuffer = encoding.GetBytes(arguments);
+                var exitBuffer = encoding.GetBytes(exit);
+
+                using (var bs = process.StandardInput.BaseStream)
                 {
-                    var arguments = "{\"Arguments\":[" + string.Join(",", args.Select(a => $"\"{a}\"")) + "]}";
-                    if (pacTrace) Console.WriteLine(arguments);
-                    sw.WriteLine(arguments);
-                    sw.WriteLine("{\"Arguments\":[\"exit\"]}");
-                    sw.Close();
+                    bs.Write(argumentsBuffer, 0, argumentsBuffer.Length);
+                    bs.Write(exitBuffer, 0, exitBuffer.Length);
+                    bs.Close();
                 }
 
                 while (!process.StandardOutput.EndOfStream)
@@ -54,7 +65,7 @@ namespace D365.Community.Pac.Wrapper
                     if (string.IsNullOrEmpty(line)) continue;
                     if (pacDebug) Console.WriteLine(line);
                     result.Add(line);
-                    using (var ms = new MemoryStream(Encoding.UTF8.GetBytes(line)))
+                    using (var ms = new MemoryStream(encoding.GetBytes(line)))
                     {
                         var pacResult = (PacResult)new DataContractJsonSerializer(typeof(PacResult), Settings).ReadObject(ms);
                         if (pacResult.Status?.ToLowerInvariant() == "success") continue;
