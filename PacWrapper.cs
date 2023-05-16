@@ -20,6 +20,7 @@ namespace D365.Community.Pac.Wrapper
         public static string Execute(string pac, params string[] args)
         {
             var pacDebug = bool.Parse(Environment.GetEnvironmentVariable("D365_PAC_DEBUG") ?? "false");
+            var pacTrace = bool.Parse(Environment.GetEnvironmentVariable("D365_PAC_TRACE") ?? "false");
             var result = new List<string>();
             var failed = false;
             try
@@ -40,7 +41,9 @@ namespace D365.Community.Pac.Wrapper
 
                 using (var sw = process.StandardInput)
                 {
-                    sw.WriteLine("{\"Arguments\":[" + string.Join(",", args.Select(a => $"\"{a}\"")) + "]}");
+                    var arguments = "{\"Arguments\":[" + string.Join(",", args.Select(a => $"\"{a}\"")) + "]}";
+                    if (pacTrace) Console.WriteLine(arguments);
+                    sw.WriteLine(arguments);
                     sw.WriteLine("{\"Arguments\":[\"exit\"]}");
                     sw.Close();
                 }
