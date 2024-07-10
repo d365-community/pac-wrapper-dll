@@ -92,8 +92,10 @@ namespace D365.Community.Pac.Wrapper
             catch (Exception e)
             {
                 failed = true;
-                Console.Error.WriteLine(e.Message);
+                Console.Error.WriteLine($"{e.GetBaseException().GetType().Name}: {e.GetBaseException().Message}");
                 Console.Error.WriteLine(e.StackTrace);
+                Console.Error.WriteLine("--------------------- StandardOut ---------------------");
+                Console.Error.WriteLine(string.Join("\r\n", result));
             }
 
             if (failed)
