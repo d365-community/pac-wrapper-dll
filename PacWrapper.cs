@@ -19,10 +19,10 @@ namespace D365.Community.Pac.Wrapper
 
         public static string Execute(string pac, params string[] args)
         {
-            Console.WriteLine(pac);
             var encoding = Encoding.GetEncoding(int.Parse(Environment.GetEnvironmentVariable("D365_PAC_CODEPAGE") ?? "1252"));
             var pacDebug = bool.Parse(Environment.GetEnvironmentVariable("D365_PAC_DEBUG") ?? "false");
             var pacTrace = bool.Parse(Environment.GetEnvironmentVariable("D365_PAC_TRACE") ?? "false");
+            if (pacDebug) Console.WriteLine($"pac: {pac}");
             var result = new List<string>();
             var failed = false;
             try
