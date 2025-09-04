@@ -46,6 +46,8 @@ namespace D365.Community.Pac.Wrapper
                 };
                 process.Start();
 
+                var verbose = args.Any(a => "--verbose".Equals(a) || "--verbose-wrapper".Equals(a));
+
                 var arguments = "{\"Arguments\":[" + string.Join(",", args.Select(a => $"\"{a}\"")) + "]}" + Environment.NewLine;
                 if (pacTrace) Console.Write(arguments);
                 var exit = "{\"Arguments\":[\"exit\"]}" + Environment.NewLine;
@@ -69,23 +71,40 @@ namespace D365.Community.Pac.Wrapper
                     using (var ms = new MemoryStream(encoding.GetBytes(line)))
                     {
                         var pacResult = (PacResult)new DataContractJsonSerializer(typeof(PacResult), Settings).ReadObject(ms);
-                        if (pacResult.Status?.ToLowerInvariant() == "success") continue;
-                        failed = true;
-                        foreach (var error in pacResult.Errors)
+                        if (pacResult.Status?.ToLowerInvariant() == "success")
                         {
-                            Console.Error.WriteLine(error);
-                        }
-                        foreach (var warning in pacResult.Warnings)
-                        {
-                            Console.Error.WriteLine(warning);
-                        }
-                        if (pacDebug)
-                        {
-                            foreach (var information in pacResult.Information)
+                            foreach (var warning in pacResult.Warnings)
                             {
-                                Console.Error.WriteLine(information);
+                                Console.WriteLine($"Warning: {warning}");
+                            }
+                            if (pacDebug || verbose)
+                            {
+                                foreach (var information in pacResult.Information)
+                                {
+                                    Console.WriteLine(information);
+                                }
                             }
                         }
+                        else
+                        {
+                            failed = true;
+                            foreach (var error in pacResult.Errors)
+                            {
+                                Console.Error.WriteLine($"Error: {error}");
+                            }
+                            foreach (var warning in pacResult.Warnings)
+                            {
+                                Console.WriteLine($"Warning: {warning}");
+                            }
+                            if (pacDebug)
+                            {
+                                foreach (var information in pacResult.Information)
+                                {
+                                    Console.Error.WriteLine(information);
+                                }
+                            }
+                        }
+
                     }
                 }
                 process.WaitForExit();
