@@ -46,9 +46,14 @@ namespace D365.Community.Pac.Wrapper
                 };
                 process.Start();
 
-                var verbose = args.Any(a => "--verbose".Equals(a) || "--verbose-wrapper".Equals(a));
+                var argList = args.ToList();
+                var verbose = argList.Any(a => "--verbose".Equals(a) || "--verbose-wrapper".Equals(a));
+                if (argList.IndexOf("--verbose-wrapper") > -1)
+                {
+                    argList.Remove("--verbose-wrapper");
+                }
 
-                var arguments = "{\"Arguments\":[" + string.Join(",", args.Select(a => $"\"{a}\"")) + "]}" + Environment.NewLine;
+                var arguments = "{\"Arguments\":[" + string.Join(",", argList.Select(a => $"\"{a}\"")) + "]}" + Environment.NewLine;
                 if (pacTrace) Console.Write(arguments);
                 var exit = "{\"Arguments\":[\"exit\"]}" + Environment.NewLine;
 
