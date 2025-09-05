@@ -35,4 +35,4 @@ jobs:
         uses: actions/upload-artifact@v4.6.2
         with:
             name: pac-wrapper
-            path: pac-wrapper-dll/bin/Release/pac-wrapper.dll
+            path: pac-wrapper-dll/pac-wrapper-dll/bin/Release/pac-wrapper.dll
