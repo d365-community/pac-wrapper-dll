@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace D365.Community.Pac.Wrapper
 {
@@ -19,10 +20,20 @@ namespace D365.Community.Pac.Wrapper
 
         public static string Execute(string pac, params string[] args)
         {
+            return Execute(pac, -1, args);
+        }
+
+        public static string Execute(string pac, int milliseconds, params string[] args)
+        {
+
             var encoding = Encoding.GetEncoding(int.Parse(Environment.GetEnvironmentVariable("D365_PAC_CODEPAGE") ?? "1252"));
             var pacDebug = bool.Parse(Environment.GetEnvironmentVariable("D365_PAC_DEBUG") ?? "false");
             var pacTrace = bool.Parse(Environment.GetEnvironmentVariable("D365_PAC_TRACE") ?? "false");
             if (pacDebug) Console.WriteLine($"pac: {pac}");
+            if (milliseconds > 1000)
+            {
+                Console.WriteLine($"wait for exit: {milliseconds}ms");
+            }
             var result = new List<string>();
             var failed = false;
             try
@@ -44,6 +55,8 @@ namespace D365.Community.Pac.Wrapper
                         CreateNoWindow = true
                     }
                 };
+                process.EnableRaisingEvents = true;
+                process.Exited += ProcessHasExited;
                 process.Start();
 
                 var argList = args.ToList();
@@ -67,52 +80,78 @@ namespace D365.Community.Pac.Wrapper
                     bs.Close();
                 }
 
-                while (!process.StandardOutput.EndOfStream)
+                var standardOutput = Task.Run(() =>
                 {
-                    var line = process.StandardOutput.ReadLine();
-                    if (string.IsNullOrEmpty(line)) continue;
-                    if (pacDebug) Console.WriteLine(line);
-                    result.Add(line);
-                    using (var ms = new MemoryStream(encoding.GetBytes(line)))
+                    while (!process.StandardOutput.EndOfStream)
                     {
-                        var pacResult = (PacResult)new DataContractJsonSerializer(typeof(PacResult), Settings).ReadObject(ms);
-                        if (pacResult.Status?.ToLowerInvariant() == "success")
+                        var line = process.StandardOutput.ReadLine();
+                        if (string.IsNullOrEmpty(line)) continue;
+                        if (pacDebug) Console.WriteLine(line);
+                        result.Add(line);
+                        using (var ms = new MemoryStream(encoding.GetBytes(line)))
                         {
-                            foreach (var warning in pacResult.Warnings)
+                            var pacResult = (PacResult)new DataContractJsonSerializer(typeof(PacResult), Settings).ReadObject(ms);
+                            if (pacResult.Status?.ToLowerInvariant() == "success")
                             {
-                                Console.WriteLine($"Warning: {warning}");
-                            }
-                            if (pacDebug || verbose)
-                            {
-                                foreach (var information in pacResult.Information)
+                                foreach (var warning in pacResult.Warnings)
                                 {
-                                    Console.WriteLine(information);
+                                    Console.WriteLine($"Warning: {warning}");
+                                }
+                                if (pacDebug || verbose)
+                                {
+                                    foreach (var information in pacResult.Information)
+                                    {
+                                        Console.WriteLine(information);
+                                    }
                                 }
                             }
-                        }
-                        else
-                        {
-                            failed = true;
-                            foreach (var error in pacResult.Errors)
+                            else
                             {
-                                Console.Error.WriteLine($"Error: {error}");
-                            }
-                            foreach (var warning in pacResult.Warnings)
-                            {
-                                Console.WriteLine($"Warning: {warning}");
-                            }
-                            if (pacDebug)
-                            {
-                                foreach (var information in pacResult.Information)
+                                failed = true;
+                                foreach (var error in pacResult.Errors)
                                 {
-                                    Console.Error.WriteLine(information);
+                                    Console.Error.WriteLine($"Error: {error}");
+                                }
+                                foreach (var warning in pacResult.Warnings)
+                                {
+                                    Console.WriteLine($"Warning: {warning}");
+                                }
+                                if (pacDebug)
+                                {
+                                    foreach (var information in pacResult.Information)
+                                    {
+                                        Console.Error.WriteLine(information);
+                                    }
                                 }
                             }
-                        }
 
+                        }
+                    }
+                });
+                var standardError = Task.Run(() =>
+                {
+                    while (!process.StandardError.EndOfStream)
+                    {
+                        var line = process.StandardError.ReadLine();
+                        if (string.IsNullOrEmpty(line)) continue;
+                        Console.Error.WriteLine(line);
+                    }
+                });
+
+                if (milliseconds > 1000)
+                {
+                    var exited = process.WaitForExit(milliseconds);
+                    if (!exited)
+                    {
+                        failed = true;
+                        Console.Error.WriteLine($"process does not finish within {milliseconds}ms; kill process: {process.Id}");
+                        process.Kill();
                     }
                 }
-                process.WaitForExit();
+                else
+                {
+                    process.WaitForExit();
+                }
             }
             catch (Exception e)
             {
@@ -128,6 +167,11 @@ namespace D365.Community.Pac.Wrapper
                 throw new Exception("pac wrapper failed!");
             }
             return string.Join("\r\n", result.Skip(1));
+        }
+
+        private static void ProcessHasExited(object sender, EventArgs e)
+        {
+            Console.WriteLine("pac has exited");
         }
     }
 }
